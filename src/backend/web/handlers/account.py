@@ -25,7 +25,7 @@ from backend.common.consts.notification_type import (
 from backend.common.helpers.event_helper import EventHelper
 from backend.common.helpers.match_helper import MatchHelper
 from backend.common.helpers.season_helper import SeasonHelper
-from backend.common.models.keys import TeamNumber, Year
+from backend.common.models.keys import TeamNumber
 from backend.common.models.team import Team
 from backend.common.sitevars.notifications_enable import NotificationsEnable
 from backend.web.auth import create_session_cookie, current_user, revoke_session_cookie
@@ -249,7 +249,11 @@ def mytba() -> str:
 def mytba_team(team_number: TeamNumber) -> Response:
     user = none_throws(current_user())
 
-    team = Team.get_by_id("frc{}".format(team_number))
+    team_key = "frc{}".format(team_number)
+    if not Team.validate_key_name(team_key):
+        abort(404)
+
+    team = Team.get_by_id(team_key)
     if not team:
         abort(404)
 
@@ -264,7 +268,7 @@ def mytba_team(team_number: TeamNumber) -> Response:
                 parent=user_account_key,
                 user_id=user_uid,
                 model_type=ModelType.TEAM,
-                model_key=team_key
+                model_key=team_key,
             )
             MyTBAHelper.add_favorite(favorite)
         else:
@@ -277,7 +281,7 @@ def mytba_team(team_number: TeamNumber) -> Response:
                 user_id=user_uid,
                 model_type=ModelType.TEAM,
                 model_key=team_key,
-                notification_types=[int(nt) for nt in notification_types]
+                notification_types=[int(nt) for nt in notification_types],
             )
             MyTBAHelper.add_subscription(subscription)
         else:
@@ -291,8 +295,13 @@ def mytba_team(team_number: TeamNumber) -> Response:
         favorite = mytba.favorite(ModelType.TEAM, team_key)
         subscription = mytba.subscription(ModelType.TEAM, team_key)
 
-        is_favorite = True if (not favorite and not subscription) else (favorite is not None)
-        enabled_notifications = [(en, NOTIFICATION_TYPE_RENDER_NAMES[en]) for en in ENABLED_TEAM_NOTIFICATIONS]
+        is_favorite = (
+            True if (not favorite and not subscription) else (favorite is not None)
+        )
+        enabled_notifications = [
+            (en, NOTIFICATION_TYPE_RENDER_NAMES[en])
+            for en in ENABLED_TEAM_NOTIFICATIONS
+        ]
 
         template_values = {
             "team": team,
